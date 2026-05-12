@@ -1,0 +1,47 @@
+[project]
+name = "scheduler-mgr"
+version = "0.1.0"
+description = "Scheduler Manager"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.18.3",
+    "app-base",
+    "asyncpg>=0.31.0",
+    "cachetools>=7.0.0",
+    "croniter>=6.0.0",
+    "dotenv>=0.9.9",
+    "fastapi>=0.128.2",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "orjson>=3.11.7",
+    "pydantic-settings>=2.12.0",
+    "sqlalchemy>=2.0.46",
+]
+
+[tool.uv.sources]
+app-base = { git = "https://github.com/mjkimR/app-common.git", subdirectory = "app-base", rev = "main" }
+app-tools = { git = "https://github.com/mjkimR/app-common.git", subdirectory = "app-tools", rev = "main" }
+
+[dependency-groups]
+dev = [
+    "app-tools",
+    "polyfactory>=3.2.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.0",
+]
+
+[tool.pytest.ini_options]
+log_level = "INFO"
+pythonpath = "."
+testpaths = "tests"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.pyright]
+venvPath = "../../"
+venv = ".venv"
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+extraPaths = ["."]
