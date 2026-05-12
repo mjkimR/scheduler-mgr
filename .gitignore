@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Hidden files
+.*
+!.gitignore
+!.env.example
+!.python-version
+!.vscode
+
+# Virtual environments
+.venv
+
+# Docker
+!.dockerignore
+
+# Others
+**/logs
