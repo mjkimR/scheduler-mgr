@@ -19,11 +19,12 @@ def make():
 
     Usage: make(User, name="test")
     - model_class: Pydantic model class to create
+    - _use_default: whether to use default values defined in the model (default: False)
     - kwargs: fields to override in the factory
     """
 
-    def _make(model_class: Type[T], **kwargs: Any) -> T:
-        factory = ModelFactory.create_factory(model_class)
+    def _make(model_class: Type[T], _use_default: bool = False, **kwargs: Any) -> T:
+        factory = ModelFactory.create_factory(model_class, __use_defaults__=_use_default)
         return factory.build(**kwargs)
 
     return _make
@@ -36,11 +37,12 @@ def make_batch():
     Usage: make_batch(User, 3, name="test")
     - model_class: Pydantic model class to create
     - _size: number of models to create (default: 3)
+    - _use_default: whether to use default values defined in the model (default: False)
     - kwargs: fields to override in the factory
     """
 
-    def _make_batch(model_class: Type[T], _size: int = 3, **kwargs: Any) -> list[T]:
-        factory = ModelFactory.create_factory(model_class)
+    def _make_batch(model_class: Type[T], _size: int = 3, _use_default: bool = False, **kwargs: Any) -> list[T]:
+        factory = ModelFactory.create_factory(model_class, __use_defaults__=_use_default)
         return factory.batch(size=_size, **kwargs)
 
     return _make_batch
@@ -64,12 +66,21 @@ def make_db(session: AsyncSession):
 
     Usage: await make_db(UserRepository, name="test")
     - repo_class_or_instance: repo class or instance to use for creating the model (e.g., UserRepository)
-    - kwargs: fields to override in the factory
+    - _build_kwargs: extra keyword arguments passed to factory.build()
+    - _create_kwargs: extra keyword arguments passed to repo.create()
+    - _use_default: whether to use default values defined in the schema (default: False)
+    - kwargs: fields to override in the factory (used for build only)
 
     Returns the created SQLAlchemy model instance after saving to the database.
     """
 
-    async def _make_db(repo_class_or_instance: type[BaseRepository] | BaseRepository, **kwargs: Any) -> Base:
+    async def _make_db(
+        repo_class_or_instance: type[BaseRepository] | BaseRepository,
+        _build_kwargs: dict[str, Any] | None = None,
+        _create_kwargs: dict[str, Any] | None = None,
+        _use_default: bool = False,
+        **kwargs: Any,
+    ) -> Base:
         if not isinstance(repo_class_or_instance, type):
             repo_class = type(repo_class_or_instance)
             repo = repo_class_or_instance
@@ -77,9 +88,9 @@ def make_db(session: AsyncSession):
             repo_class = repo_class_or_instance
             repo = resolve_dependency(repo_class_or_instance)
         create_schema_type = _find_generic_args(repo_class)
-        factory = ModelFactory.create_factory(create_schema_type)
-        data = factory.build()
-        return await repo.create(session, data, **kwargs)
+        factory = ModelFactory.create_factory(create_schema_type, __use_defaults__=_use_default)
+        data = factory.build(**{**kwargs, **(_build_kwargs or {})})
+        return await repo.create(session, data, **{**kwargs, **(_create_kwargs or {})})
 
     return _make_db
 
@@ -91,13 +102,21 @@ def make_db_batch(session: AsyncSession):
     Usage: await make_db_batch(UserRepository, 3)
     - repo_class_or_instance: Repo class or instance to use for creating the models (e.g., UserRepository)
     - _size: number of models to create (default: 3)
-    - kwargs: fields to override in the factory
+    - _build_kwargs: extra keyword arguments passed to factory.batch()
+    - _create_kwargs: extra keyword arguments passed to repo.create()
+    - _use_default: whether to use default values defined in the schema (default: False)
+    - kwargs: fields to override in the factory (used for build only)
 
     Returns a list of created SQLAlchemy model instances after saving to the database.
     """
 
     async def _make_db_batch(
-        repo_class_or_instance: BaseRepository | type[BaseRepository], _size: int = 3, **kwargs: Any
+        repo_class_or_instance: BaseRepository | type[BaseRepository],
+        _size: int = 3,
+        _build_kwargs: dict[str, Any] | None = None,
+        _create_kwargs: dict[str, Any] | None = None,
+        _use_default: bool = False,
+        **kwargs: Any,
     ) -> list[Base]:
         if not isinstance(repo_class_or_instance, type):
             repo_class = type(repo_class_or_instance)
@@ -106,11 +125,11 @@ def make_db_batch(session: AsyncSession):
             repo_class = repo_class_or_instance
             repo = resolve_dependency(repo_class_or_instance)
         create_schema_type = _find_generic_args(repo_class)
-        factory = ModelFactory.create_factory(create_schema_type)
-        data_list = factory.batch(size=_size)
+        factory = ModelFactory.create_factory(create_schema_type, __use_defaults__=_use_default)
+        data_list = factory.batch(size=_size, **{**kwargs, **(_build_kwargs or {})})
         results = []
         for data in data_list:
-            results.append(await repo.create(session, data, **kwargs))
+            results.append(await repo.create(session, data, **{**kwargs, **(_create_kwargs or {})}))
         return results
 
     return _make_db_batch
@@ -123,11 +142,12 @@ def make_api(client: AsyncClient):
     Usage: await make_api("/users/", UserCreate, name="test")
     - endpoint: API endpoint to create the model
     - model_class: Pydantic model class for the request body
+    - _use_default: whether to use default values defined in the model (default: False)
     - kwargs: fields to override in the factory
     """
 
-    async def _make_api(endpoint: str, model_class: Type[T], **kwargs: Any) -> T:
-        factory = ModelFactory.create_factory(model_class)
+    async def _make_api(endpoint: str, model_class: Type[T], _use_default: bool = False, **kwargs: Any) -> T:
+        factory = ModelFactory.create_factory(model_class, __use_defaults__=_use_default)
         data = factory.build(**kwargs)
         response = await client.post(endpoint, json=data.model_dump())
         response.raise_for_status()
@@ -144,11 +164,14 @@ def make_api_batch(client: AsyncClient):
     - endpoint: API endpoint to create the models
     - model_class: Pydantic model class for the request body
     - _size: number of models to create (default: 3)
+    - _use_default: whether to use default values defined in the model (default: False)
     - kwargs: fields to override in the factory
     """
 
-    async def _make_api_batch(endpoint: str, model_class: Type[T], _size: int = 3, **kwargs: Any) -> list[T]:
-        factory = ModelFactory.create_factory(model_class)
+    async def _make_api_batch(
+        endpoint: str, model_class: Type[T], _size: int = 3, _use_default: bool = False, **kwargs: Any
+    ) -> list[T]:
+        factory = ModelFactory.create_factory(model_class, __use_defaults__=_use_default)
         data_list = factory.batch(size=_size, **kwargs)
         payload = [data.model_dump() for data in data_list]
         response = await client.post(endpoint, json=payload)
