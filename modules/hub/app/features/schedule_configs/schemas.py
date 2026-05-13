@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app_base.base.schemas.mixin import TimestampSchemaMixin, UUIDSchemaMixin
+from croniter import CroniterBadCronError, croniter
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -34,6 +35,11 @@ class ScheduleConfigBase(BaseModel):
             raise ValueError("Either cron_expression or interval_seconds must be provided.")
         if self.cron_expression is not None and self.interval_seconds is not None:
             raise ValueError("cron_expression and interval_seconds are mutually exclusive.")
+        if self.cron_expression is not None:
+            try:
+                croniter(self.cron_expression)
+            except (CroniterBadCronError, ValueError) as e:
+                raise ValueError(f"Invalid cron_expression: {e}") from e
         return self
 
 
@@ -61,6 +67,17 @@ class ScheduleConfigPatch(BaseModel):
     end_at: datetime | None = Field(
         default=None, description="Optional datetime after which the schedule is no longer executed."
     )
+
+    @model_validator(mode="after")
+    def validate_trigger(self) -> "ScheduleConfigPatch":
+        if self.cron_expression is not None and self.interval_seconds is not None:
+            raise ValueError("cron_expression and interval_seconds are mutually exclusive.")
+        if self.cron_expression is not None:
+            try:
+                croniter(self.cron_expression)
+            except (CroniterBadCronError, ValueError) as e:
+                raise ValueError(f"Invalid cron_expression: {e}") from e
+        return self
 
 
 class ScheduleConfigRead(UUIDSchemaMixin, TimestampSchemaMixin, ScheduleConfigBase):

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from app.common.database import JSON_VARIANT
 from app_base.base.models.mixin import Base, TimestampMixin, UUIDMixin
+from sqlalchemy import DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -32,14 +33,18 @@ class ScheduleConfig(Base, UUIDMixin, TimestampMixin):
         comment="Whether this schedule is active and should be picked up by the dispatcher",
     )
     start_at: Mapped[datetime | None] = mapped_column(
-        nullable=True, comment="Optional datetime after which the schedule becomes active"
+        DateTime(timezone=True), nullable=True, comment="Optional datetime after which the schedule becomes active"
     )
     end_at: Mapped[datetime | None] = mapped_column(
-        nullable=True, comment="Optional datetime after which the schedule is no longer executed"
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Optional datetime after which the schedule is no longer executed",
     )
     last_run_at: Mapped[datetime | None] = mapped_column(
-        nullable=True, comment="Timestamp of the most recent execution"
+        DateTime(timezone=True), nullable=True, comment="Timestamp of the most recent execution"
     )
     next_run_at: Mapped[datetime | None] = mapped_column(
-        nullable=True, comment="Timestamp of the next scheduled execution"
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Timestamp of the next scheduled execution. NULL indicates this schedule should be executed immediately by the dispatcher.",
     )

@@ -49,7 +49,7 @@ class SystemConfigService(
         obj_data: SystemConfigCreate | SystemConfigPut | SystemConfigPatch,
         context: SystemConfigContextKwargs,
     ):
-        if obj_data.key:
+        if obj_data.name:
             yield self.repo.model.name == obj_data.name, "SystemConfig name must be unique."
 
     async def get_by_name(
