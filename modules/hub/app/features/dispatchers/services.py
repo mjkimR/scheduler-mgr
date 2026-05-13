@@ -12,6 +12,7 @@ from app.features.schedule_configs.schemas import ScheduleConfigRead
 from app.features.schedule_jobs.models import ScheduleJob, ScheduleJobStatus
 from app.features.schedule_jobs.repos import ScheduleJobRepository
 from app.features.schedule_jobs.schemas import ScheduleJobRead
+from app.features.tasks.core.context import task_context
 from app_base.core.database.transaction import AsyncTransaction
 from app_base.core.log import logger
 from fastapi import Depends
@@ -155,7 +156,7 @@ class DispatcherService:
         result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def dispatch_jobs(self, jobs: list[tuple[ScheduleJobRead, ScheduleConfigRead]]) -> None:
+    async def dispatch_jobs(self, jobs: list[tuple[ScheduleJobRead, ScheduleConfigRead]], run_id: UUID) -> None:
         """Dispatch a batch of schedule jobs concurrently with a global timeout.
 
         All jobs are gathered concurrently. If the entire batch exceeds the global
@@ -163,10 +164,11 @@ class DispatcherService:
 
         Args:
             jobs: A list of (ScheduleJobRead, ScheduleConfigRead) tuples to dispatch.
+            run_id: The UUID of the dispatcher run for traceability.
         """
         try:
             await asyncio.wait_for(
-                asyncio.gather(*[self._dispatch(job, config) for job, config in jobs]),
+                asyncio.gather(*[self._dispatch(job, config, run_id=run_id) for job, config in jobs]),
                 timeout=self.global_timeout,
             )
         except asyncio.TimeoutError:
@@ -174,17 +176,18 @@ class DispatcherService:
                 f"tick() gather timed out after {self.global_timeout}s",
             )
 
-    async def _dispatch(self, job: ScheduleJobRead, config: ScheduleConfigRead) -> None:
+    async def _dispatch(self, job: ScheduleJobRead, config: ScheduleConfigRead, run_id: UUID) -> None:
         """Acquire the concurrency semaphore and delegate to _run_dispatch.
 
         Args:
             job: The persisted job record associated with this dispatch.
             config: The schedule configuration that triggered this job.
+            run_id: The UUID of the dispatcher run for traceability.
         """
         async with self._semaphore:
-            await self._run_dispatch(job, config)
+            await self._run_dispatch(job, config, run_id=run_id)
 
-    async def _run_dispatch(self, job: ScheduleJobRead, config: ScheduleConfigRead) -> None:
+    async def _run_dispatch(self, job: ScheduleJobRead, config: ScheduleConfigRead, run_id: UUID) -> None:
         """Execute the task function associated with a schedule config and record the result.
 
         Looks up the task function from the task registry, invokes it (supporting both
@@ -194,52 +197,54 @@ class DispatcherService:
         Args:
             job: The persisted job record to be updated after execution.
             config: The schedule configuration providing the task function and payload.
+            run_id: The UUID of the dispatcher run for traceability.
         """
-        error_message: str | None = None
-        is_cancelled = False
-        retry_need = False
-        status = ScheduleJobStatus.SUCCESS
+        with task_context(config_id=config.id, config_name=config.name, run_id=run_id):
+            error_message: str | None = None
+            is_cancelled = False
+            retry_need = False
+            status = ScheduleJobStatus.SUCCESS
 
-        try:
-            func = task_registry.get(config.task_func)
-            if func is None:
-                raise ValueError(f"Task function '{config.task_func}' is not registered in task_registry.")
-            if iscoroutinefunction(func):
-                await func(**config.payload)
-            else:
-                raise TypeError(f"Task function '{config.task_func}' must be an async function.")
-            logger.debug(f"Dispatched schedule '{config.name}' (id={config.id})")
-        except asyncio.TimeoutError:
-            status = ScheduleJobStatus.FAILURE
-            error_message = f"Task timed out after {self.global_timeout}s"
-            logger.error(f"Schedule '{config.name}' (id={config.id}) timed out individually")
-            retry_need = True
-        except asyncio.CancelledError:
-            status = ScheduleJobStatus.FAILURE
-            error_message = "Task was cancelled (likely due to app shutdown or outer timeout)"
-            logger.warning(f"Schedule '{config.name}' (id={config.id}) was cancelled")
-            is_cancelled = True
-            retry_need = True
-        except Exception as e:
-            status = ScheduleJobStatus.FAILURE
-            error_message = str(e)
-            logger.error(f"Schedule '{config.name}' (id={config.id}) failed: {e}")
+            try:
+                func = task_registry.get(config.task_func)
+                if func is None:
+                    raise ValueError(f"Task function '{config.task_func}' is not registered in task_registry.")
+                if iscoroutinefunction(func):
+                    await func(**config.payload)
+                else:
+                    raise TypeError(f"Task function '{config.task_func}' must be an async function.")
+                logger.debug(f"Dispatched schedule '{config.name}' (id={config.id})")
+            except asyncio.TimeoutError:
+                status = ScheduleJobStatus.FAILURE
+                error_message = f"Task timed out after {self.global_timeout}s"
+                logger.error(f"Schedule '{config.name}' (id={config.id}) timed out individually")
+                retry_need = True
+            except asyncio.CancelledError:
+                status = ScheduleJobStatus.FAILURE
+                error_message = "Task was cancelled (likely due to app shutdown or outer timeout)"
+                logger.warning(f"Schedule '{config.name}' (id={config.id}) was cancelled")
+                is_cancelled = True
+                retry_need = True
+            except Exception as e:
+                status = ScheduleJobStatus.FAILURE
+                error_message = str(e)
+                logger.error(f"Schedule '{config.name}' (id={config.id}) failed: {e}")
 
-        finished_at = datetime.now(timezone.utc)
+            finished_at = datetime.now(timezone.utc)
 
-        # Update schedule job
-        async with AsyncTransaction() as session:
-            job_obj = await self.job_repo.get_by_pk(session, job.id)
-            if job_obj:
-                job_obj.status = status
-                job_obj.finished_at = finished_at
-                job_obj.error_message = error_message
-                job_obj.retry_need = retry_need
-                job_obj.retry_attempts = (job_obj.retry_attempts or 0) + 1
-                session.add(job_obj)
-                await session.commit()
-            else:
-                logger.error(f"Failed to update ScheduleJob (id={job.id}) - not found")
+            # Update schedule job
+            async with AsyncTransaction() as session:
+                job_obj = await self.job_repo.get_by_pk(session, job.id)
+                if job_obj:
+                    job_obj.status = status
+                    job_obj.finished_at = finished_at
+                    job_obj.error_message = error_message
+                    job_obj.retry_need = retry_need
+                    job_obj.retry_attempts = (job_obj.retry_attempts or 0) + 1
+                    session.add(job_obj)
+                    await session.commit()
+                else:
+                    logger.error(f"Failed to update ScheduleJob (id={job.id}) - not found")
 
-        if is_cancelled:
-            raise asyncio.CancelledError  # Reraise
+            if is_cancelled:
+                raise asyncio.CancelledError  # Reraise

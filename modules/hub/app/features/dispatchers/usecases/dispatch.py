@@ -70,6 +70,6 @@ class DispatchUseCase:
 
         # Run the schedule jobs
         if schedule_jobs:
-            await self.service.dispatch_jobs(schedule_jobs)
+            await self.service.dispatch_jobs(schedule_jobs, run_id=run_id)
 
         return len(schedule_jobs)
