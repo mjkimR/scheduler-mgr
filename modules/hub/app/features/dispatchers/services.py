@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+from inspect import iscoroutinefunction
 from typing import Annotated, Sequence
 from uuid import UUID
 
@@ -97,6 +98,7 @@ class DispatcherService:
                 (ScheduleConfig.start_at.is_(None)) | (ScheduleConfig.start_at <= now),
                 (ScheduleConfig.end_at.is_(None)) | (ScheduleConfig.end_at >= now),
             )
+            .limit(self.settings.MAX_DISPATCH_LIMIT)
             .with_for_update(skip_locked=True)
         )
         result = await session.execute(stmt)
@@ -142,6 +144,7 @@ class DispatcherService:
                 ScheduleJob.retry_attempts < ScheduleJob.retry_max,
             )
             .options(joinedload(ScheduleJob.schedule_config))
+            .limit(self.settings.MAX_DISPATCH_LIMIT)
             .with_for_update(skip_locked=True)
         )
 
@@ -201,7 +204,7 @@ class DispatcherService:
             func = task_registry.get(config.task_func)
             if func is None:
                 raise ValueError(f"Task function '{config.task_func}' is not registered in task_registry.")
-            if asyncio.iscoroutinefunction(func):
+            if iscoroutinefunction(func):
                 await func(**config.payload)
             else:
                 raise TypeError(f"Task function '{config.task_func}' must be an async function.")

@@ -12,6 +12,9 @@ class SchedulerDefaults(BaseSettings):
     )
     MAX_CONCURRENT_TASKS: int = Field(10, description="Maximum number of concurrent tasks that can be scheduled")
     MAX_RETRY_ATTEMPTS: int = Field(3, description="Maximum number of retry attempts for failed tasks")
+    MAX_DISPATCH_LIMIT: int = Field(
+        200, description="Maximum number of schedules or retry jobs to fetch in a single tick"
+    )
 
     @property
     def effective_timeout(self) -> int:
