@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api")
-v1_router = APIRouter(prefix="/v1", dependencies=[Depends(verify_api_key)])
+v1_router = APIRouter(prefix="/v1", dependencies=[])
 
 
 @router.get("/health", status_code=204)
