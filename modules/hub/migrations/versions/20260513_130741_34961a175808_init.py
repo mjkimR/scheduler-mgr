@@ -1,8 +1,8 @@
 """init
 
-Revision ID: b3a53d29fb73
+Revision ID: 34961a175808
 Revises: 
-Create Date: 2026-05-12 14:23:27.897377
+Create Date: 2026-05-13 13:07:41.965585
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ from sqlalchemy import Text
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'b3a53d29fb73'
+revision: str = '34961a175808'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -30,10 +30,10 @@ def upgrade() -> None:
     sa.Column('interval_seconds', sa.Integer(), nullable=True, comment='Fixed interval in seconds between executions. Mutually exclusive with cron_expression'),
     sa.Column('payload', sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), 'postgresql'), nullable=False, comment='Arbitrary JSON payload passed to the task function as kwargs'),
     sa.Column('enabled', sa.Boolean(), nullable=False, comment='Whether this schedule is active and should be picked up by the dispatcher'),
-    sa.Column('start_at', sa.DateTime(), nullable=True, comment='Optional datetime after which the schedule becomes active'),
-    sa.Column('end_at', sa.DateTime(), nullable=True, comment='Optional datetime after which the schedule is no longer executed'),
-    sa.Column('last_run_at', sa.DateTime(), nullable=True, comment='Timestamp of the most recent execution'),
-    sa.Column('next_run_at', sa.DateTime(), nullable=True, comment='Timestamp of the next scheduled execution'),
+    sa.Column('start_at', sa.DateTime(timezone=True), nullable=True, comment='Optional datetime after which the schedule becomes active'),
+    sa.Column('end_at', sa.DateTime(timezone=True), nullable=True, comment='Optional datetime after which the schedule is no longer executed'),
+    sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=True, comment='Timestamp of the most recent execution'),
+    sa.Column('next_run_at', sa.DateTime(timezone=True), nullable=True, comment='Timestamp of the next scheduled execution'),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -48,13 +48,18 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
-    op.create_table('schedule_logs',
-    sa.Column('schedule_config_id', sa.UUID(), nullable=True, comment='Reference to the schedule config that triggered this log.'),
-    sa.Column('status', sa.String(), nullable=False, comment='Execution status of the schedule. One of: running, success, failure.'),
-    sa.Column('started_at', sa.DateTime(), nullable=False, comment='Timestamp when the task execution started.'),
-    sa.Column('finished_at', sa.DateTime(), nullable=True, comment='Timestamp when the task execution finished.'),
+    op.create_table('schedule_jobs',
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('schedule_config_id', sa.UUID(), nullable=True, comment='Reference to the schedule config that triggered this job execution.'),
+    sa.Column('dispatcher_run_id', sa.Uuid(), nullable=True, comment='Reference to the dispatcher run that executed this job. This allows grouping multiple schedule jobs under a single dispatcher run for better traceability.'),
+    sa.Column('status', sa.String(), nullable=False, comment='Execution status of the schedule.'),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=False, comment='Timestamp when the task execution started.'),
+    sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True, comment='Timestamp when the task execution finished.'),
     sa.Column('payload', sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), 'postgresql'), nullable=False, comment='Snapshot of the payload used during execution.'),
     sa.Column('error_message', sa.String(), nullable=True, comment='Error message if the task execution failed.'),
+    sa.Column('retry_need', sa.Boolean(), nullable=False, comment='Indicates whether this job needs to be retried. This can be set to True for failed jobs that should be retried by the dispatcher.'),
+    sa.Column('retry_attempts', sa.Integer(), nullable=False, comment='Number of retry attempts that have been made for this job. This can be used by the dispatcher to implement retry logic with a maximum number of attempts.'),
+    sa.Column('retry_max', sa.Integer(), nullable=False, comment='Maximum number of retry attempts allowed for this job. Once retry_attempts reaches this number, the job will no longer be retried.'),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -67,7 +72,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_table('schedule_logs')
+    op.drop_table('schedule_jobs')
     op.drop_table('system_configs')
     op.drop_table('schedule_configs')
     # ### end Alembic commands ###
