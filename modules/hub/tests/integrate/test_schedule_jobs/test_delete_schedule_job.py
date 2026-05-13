@@ -1,0 +1,35 @@
+from datetime import datetime, timezone
+
+import pytest
+from app.features.schedule_jobs.models import ScheduleJob, ScheduleJobStatus
+from app.features.schedule_jobs.repos import ScheduleJobRepository
+from app.features.schedule_jobs.services import ScheduleJobContextKwargs
+from app.features.schedule_jobs.usecases.crud import DeleteScheduleJobUseCase
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests.utils.fastapi import resolve_dependency
+
+
+@pytest.mark.integrate
+class TestDeleteScheduleJob:
+    async def test_delete_schedule_job_success(
+        self,
+        inspect_session: AsyncSession,
+        make_db,
+    ):
+        job: ScheduleJob = await make_db(
+            ScheduleJobRepository,
+            name="delete_target_job",
+            status=ScheduleJobStatus.SUCCESS,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+            payload={},
+        )
+
+        use_case = resolve_dependency(DeleteScheduleJobUseCase)
+        context: ScheduleJobContextKwargs = {}
+
+        await use_case.execute(job.id, context=context)
+
+        db_job = await inspect_session.get(ScheduleJob, job.id)
+        assert db_job is None

@@ -7,6 +7,7 @@ available from the root tests/conftest.py through pytest's fixture discovery.
 """
 
 import pytest_asyncio
+
 from tests.fixtures.db import get_base
 from tests.utils import clean_db_after_test
 
