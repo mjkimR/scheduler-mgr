@@ -33,36 +33,36 @@ class _TaskLogger:
         meta = get_task_meta()
         if meta is None:
             return core_logger
+
+        # Create a prefix string for the base logger's text formatter
+        short_run_id = str(meta.run_id).split("-")[0]
+        custom_prefix = f"[{meta.config_name}][run:{short_run_id}] "
+
+        # Bind context data for JSON logs, and custom_prefix for Text logs
         return core_logger.bind(
             config_id=str(meta.config_id),
             config_name=meta.config_name,
             run_id=str(meta.run_id),
+            custom_prefix=custom_prefix,
         )
 
-    @staticmethod
-    def _prefix() -> str:
-        meta = get_task_meta()
-        if meta is None:
-            return ""
-        return f"[{meta.config_name}][run:{meta.run_id}] "
-
     def debug(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).debug(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).debug(message, *args, **kwargs)
 
     def info(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).info(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).info(message, *args, **kwargs)
 
     def warning(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).warning(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).warning(message, *args, **kwargs)
 
     def error(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).error(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).error(message, *args, **kwargs)
 
     def critical(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).critical(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).critical(message, *args, **kwargs)
 
     def exception(self, message: str, *args, **kwargs):
-        self._bound_logger().opt(depth=1).exception(self._prefix() + message, *args, **kwargs)
+        self._bound_logger().opt(depth=1).exception(message, *args, **kwargs)
 
 
 logger = _TaskLogger()

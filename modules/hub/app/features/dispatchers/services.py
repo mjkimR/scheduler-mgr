@@ -15,6 +15,7 @@ from app.features.schedule_jobs.schemas import ScheduleJobRead
 from app.features.tasks.core.context import task_context
 from app_base.core.database.transaction import AsyncTransaction
 from app_base.core.log import logger
+from app_base.core.traceback import get_exception_traceback_str
 from fastapi import Depends
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,6 +205,8 @@ class DispatcherService:
             is_cancelled = False
             retry_need = False
             status = ScheduleJobStatus.SUCCESS
+            short_id = str(config.id).split("-")[0]
+            prefix = f"[sch:{config.name}|{short_id}]"
 
             try:
                 func = task_registry.get(config.task_func)
@@ -213,22 +216,23 @@ class DispatcherService:
                     await func(**config.payload)
                 else:
                     raise TypeError(f"Task function '{config.task_func}' must be an async function.")
-                logger.debug(f"Dispatched schedule '{config.name}' (id={config.id})")
+                logger.debug(f"{prefix} Dispatched schedule")
             except asyncio.TimeoutError:
                 status = ScheduleJobStatus.FAILURE
                 error_message = f"Task timed out after {self.global_timeout}s"
-                logger.error(f"Schedule '{config.name}' (id={config.id}) timed out individually")
+                logger.error(f"{prefix} timed out individually")
                 retry_need = True
             except asyncio.CancelledError:
                 status = ScheduleJobStatus.FAILURE
                 error_message = "Task was cancelled (likely due to app shutdown or outer timeout)"
-                logger.warning(f"Schedule '{config.name}' (id={config.id}) was cancelled")
+                logger.warning(f"{prefix} cancelled")
                 is_cancelled = True
                 retry_need = True
             except Exception as e:
                 status = ScheduleJobStatus.FAILURE
                 error_message = str(e)
-                logger.error(f"Schedule '{config.name}' (id={config.id}) failed: {e}")
+                error_trace = get_exception_traceback_str(e)
+                logger.error(f"{prefix} failed: {e}\n{error_trace}")
 
             finished_at = datetime.now(timezone.utc)
 
@@ -244,7 +248,7 @@ class DispatcherService:
                     session.add(job_obj)
                     await session.commit()
                 else:
-                    logger.error(f"Failed to update ScheduleJob (id={job.id}) - not found")
+                    logger.error(f"{prefix} Failed to update ScheduleJob - not found")
 
             if is_cancelled:
                 raise asyncio.CancelledError  # Reraise
