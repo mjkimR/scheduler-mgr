@@ -1,14 +1,19 @@
 from app.features.tasks import task
 from app.features.tasks.core.log import logger
+from pydantic import BaseModel
+
+
+class HelloWorldPayload(BaseModel):
+    message: str = "hello"
 
 
 @task()
-async def hello_world(message: str = "hello") -> None:
+async def hello_world(payload: HelloWorldPayload) -> None:
     """Example task. Registered as 'hello_world'."""
-    logger.info(f"[hello_world] {message}")
+    logger.info(payload.message)
 
 
-@task(name="send_report")
-async def send_report(recipient: str, report_type: str = "daily") -> None:
-    """Example task. Registered as 'send_report'."""
-    logger.info(f"[send_report] Sending {report_type} report to {recipient}")
+@task(name="no_payload_task")
+async def no_payload_task() -> None:
+    """Example task with no payload. Registered as 'no_payload_task'."""
+    logger.info("This task has no payload.")

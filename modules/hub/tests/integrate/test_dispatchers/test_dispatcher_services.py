@@ -292,19 +292,21 @@ class TestDispatchJobs:
 
         job_dto = ScheduleJobRead.model_validate(job_obj)
         config_dto = ScheduleConfigRead.model_validate(config)
-        return job_obj, job_dto, config_dto
+        run_id = job_dto.dispatcher_run_id
+
+        return job_obj, job_dto, config_dto, run_id
 
     @pytest.mark.asyncio
     async def test_successful_task_updates_job_to_success(self, service, session, config_and_job, session_maker):
         """On task success, the ScheduleJob status should be updated to SUCCESS."""
-        job_obj, job_dto, config_dto = config_and_job
+        job_obj, job_dto, config_dto, run_id = config_and_job
 
         async def _mock_hello_world(**kwargs):
             pass
 
         with patch("app.features.dispatchers.services.task_registry") as mock_registry:
             mock_registry.get.return_value = _mock_hello_world
-            await service.dispatch_jobs([(job_dto, config_dto)])
+            await service.dispatch_jobs([(job_dto, config_dto)], run_id)
 
         async with session_maker() as s:
             from sqlalchemy import select
@@ -319,14 +321,14 @@ class TestDispatchJobs:
     @pytest.mark.asyncio
     async def test_failing_task_updates_job_to_failure(self, service, session, config_and_job, session_maker):
         """On task failure, the ScheduleJob status should be FAILURE and error_message should be set."""
-        job_obj, job_dto, config_dto = config_and_job
+        job_obj, job_dto, config_dto, run_id = config_and_job
 
         async def _mock_failing(**kwargs):
             raise RuntimeError("boom")
 
         with patch("app.features.dispatchers.services.task_registry") as mock_registry:
             mock_registry.get.return_value = _mock_failing
-            await service.dispatch_jobs([(job_dto, config_dto)])
+            await service.dispatch_jobs([(job_dto, config_dto)], run_id)
 
         async with session_maker() as s:
             from sqlalchemy import select
@@ -359,13 +361,14 @@ class TestDispatchJobs:
                 )
             )
         await session.commit()
+        run_id = uuid.uuid4()
 
         async def _noop(**kwargs):
             pass
 
         with patch("app.features.dispatchers.services.task_registry") as mock_registry:
             mock_registry.get.return_value = _noop
-            await service.dispatch_jobs(pairs)
+            await service.dispatch_jobs(pairs, run_id)
 
         async with session_maker() as s:
             result = await s.execute(select(ScheduleJob).where(ScheduleJob.id.in_(job_ids)))

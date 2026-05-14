@@ -213,7 +213,7 @@ class DispatcherService:
                 if func is None:
                     raise ValueError(f"Task function '{config.task_func}' is not registered in task_registry.")
                 if iscoroutinefunction(func):
-                    await func(**config.payload)
+                    await func(payload=config.payload)
                 else:
                     raise TypeError(f"Task function '{config.task_func}' must be an async function.")
                 logger.debug(f"{prefix} Dispatched schedule")

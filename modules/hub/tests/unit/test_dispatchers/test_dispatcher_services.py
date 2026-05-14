@@ -140,6 +140,10 @@ class TestRunDispatch:
     def config(self) -> ScheduleConfigRead:
         return _make_schedule_config_read(task_func="hello_world", payload={})
 
+    @pytest.fixture
+    def run_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
     def _mock_job_obj(self):
         """Mock DB job object returned by job_repo.get_by_pk."""
         job_obj = MagicMock()
@@ -147,7 +151,7 @@ class TestRunDispatch:
         return job_obj
 
     @pytest.mark.asyncio
-    async def test_success_updates_job_as_success(self, service, job, config):
+    async def test_success_updates_job_as_success(self, service, job, config, run_id):
         """If the task executes successfully, the ScheduleJob status should be updated to SUCCESS."""
 
         async def _async_task(**kwargs):
@@ -167,14 +171,14 @@ class TestRunDispatch:
             mock_session.commit = AsyncMock()
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.SUCCESS
         assert job_obj.error_message is None
         assert job_obj.retry_need is False
 
     @pytest.mark.asyncio
-    async def test_unregistered_task_func_sets_failure(self, service, job, config):
+    async def test_unregistered_task_func_sets_failure(self, service, job, config, run_id):
         """If task_func is not registered, status should be FAILURE with an error message."""
         job_obj = self._mock_job_obj()
         service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
@@ -190,14 +194,14 @@ class TestRunDispatch:
             mock_session.commit = AsyncMock()
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.FAILURE
         assert "not registered" in job_obj.error_message
         assert job_obj.retry_need is False
 
     @pytest.mark.asyncio
-    async def test_sync_task_func_sets_failure(self, service, job, config):
+    async def test_sync_task_func_sets_failure(self, service, job, config, run_id):
         """If a synchronous function is registered, a TypeError should be raised and handled as FAILURE."""
 
         def _sync_task(**kwargs):
@@ -216,13 +220,13 @@ class TestRunDispatch:
             mock_session.commit = AsyncMock()
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.FAILURE
         assert "must be an async function" in job_obj.error_message
 
     @pytest.mark.asyncio
-    async def test_timeout_error_sets_failure_and_retry(self, service, job, config):
+    async def test_timeout_error_sets_failure_and_retry(self, service, job, config, run_id):
         """On asyncio.TimeoutError, status should be FAILURE and retry_need should be True."""
 
         async def _timeout_task(**kwargs):
@@ -241,14 +245,14 @@ class TestRunDispatch:
             mock_session.commit = AsyncMock()
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.FAILURE
         assert job_obj.retry_need is True
         assert "timed out" in job_obj.error_message
 
     @pytest.mark.asyncio
-    async def test_cancelled_error_sets_failure_and_reraises(self, service, job, config):
+    async def test_cancelled_error_sets_failure_and_reraises(self, service, job, config, run_id):
         """On asyncio.CancelledError, status should be FAILURE + retry_need=True, and CancelledError should be re-raised."""
 
         async def _cancelled_task(**kwargs):
@@ -268,13 +272,13 @@ class TestRunDispatch:
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
             with pytest.raises(asyncio.CancelledError):
-                await service._run_dispatch(job, config)
+                await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.FAILURE
         assert job_obj.retry_need is True
 
     @pytest.mark.asyncio
-    async def test_generic_exception_sets_failure_with_error_message(self, service, job, config):
+    async def test_generic_exception_sets_failure_with_error_message(self, service, job, config, run_id):
         """On a generic exception, status should be FAILURE and error_message should contain the exception message."""
         error_msg = "Something went wrong"
 
@@ -294,14 +298,14 @@ class TestRunDispatch:
             mock_session.commit = AsyncMock()
             service.job_repo.get_by_pk = AsyncMock(return_value=job_obj)
 
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)
 
         assert job_obj.status == ScheduleJobStatus.FAILURE
         assert job_obj.error_message == error_msg
         assert job_obj.retry_need is False
 
     @pytest.mark.asyncio
-    async def test_job_not_found_in_db_does_not_raise(self, service, job, config):
+    async def test_job_not_found_in_db_does_not_raise(self, service, job, config, run_id):
         """Even if the job is not found in DB, it should complete without raising an exception."""
 
         async def _async_task(**kwargs):
@@ -319,4 +323,4 @@ class TestRunDispatch:
             service.job_repo.get_by_pk = AsyncMock(return_value=None)  # job not found
 
             # Should complete without raising an exception
-            await service._run_dispatch(job, config)
+            await service._run_dispatch(job, config, run_id=run_id)

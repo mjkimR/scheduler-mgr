@@ -7,11 +7,12 @@ from app.features.schedule_configs.schemas import ScheduleConfigRead
 from app.features.schedule_jobs.models import ScheduleJobStatus
 from app.features.schedule_jobs.schemas import ScheduleJobCreate, ScheduleJobRead
 from app.features.schedule_jobs.services import ScheduleJobService
+from app_base.base.usecases.base import BaseUseCase
 from app_base.core.database.transaction import AsyncTransaction
 from fastapi import Depends
 
 
-class DispatchUseCase:
+class DispatchUseCase(BaseUseCase):
     def __init__(
         self,
         service: Annotated[DispatcherService, Depends()],
