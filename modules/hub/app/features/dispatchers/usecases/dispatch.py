@@ -31,18 +31,19 @@ class DispatchUseCase(BaseUseCase):
         async with AsyncTransaction() as session:
             # Process due schedule configs
             due_configs = await self.service.get_schedule_configs(session, now=now)
-            for config in due_configs:
-                job = await self.job_service.create(
-                    session,
-                    ScheduleJobCreate(
-                        name=config.name,
-                        schedule_config_id=config.id,
-                        dispatcher_run_id=run_id,
-                        status=ScheduleJobStatus.PENDING,
-                        started_at=now,
-                        payload=config.payload,
-                    ),
+            jobs_creates = [
+                ScheduleJobCreate(
+                    name=config.name,
+                    schedule_config_id=config.id,
+                    dispatcher_run_id=run_id,
+                    status=ScheduleJobStatus.PENDING,
+                    started_at=now,
+                    payload=config.payload,
                 )
+                for config in due_configs
+            ]
+            jobs = await self.job_service.repo.create_multi(session, jobs_creates)
+            for job, config in zip(jobs, due_configs, strict=True):
                 job_dto = ScheduleJobRead.model_validate(job)
                 config_dto = ScheduleConfigRead.model_validate(config)
 
