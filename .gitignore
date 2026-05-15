@@ -12,6 +12,7 @@ wheels/
 !.env.example
 !.python-version
 !.vscode
+!.pre-commit-config.yaml
 
 # Virtual environments
 .venv

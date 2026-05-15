@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[oc]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+
+# Build / dist
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Tests
+tests/
+**/tests/
+
+# Logs
+logs/
+**/*.log
+**/*.log.zip
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker/*.Dockerfile
+docker/build_*.sh
+.dockerignore
+
+# CI/CD & IDE
+.github/
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# README
+README.md
+**/README.md

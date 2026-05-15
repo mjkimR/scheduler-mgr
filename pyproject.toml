@@ -27,3 +27,8 @@ venv = ".venv"
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
 extraPaths = ["./modules/hub"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+]
