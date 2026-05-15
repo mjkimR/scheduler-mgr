@@ -3,7 +3,6 @@ from typing import Annotated, Optional
 from app.features.system_configs.models import SystemConfig
 from app.features.system_configs.repos import SystemConfigRepository
 from app.features.system_configs.schemas import SystemConfigCreate, SystemConfigPatch, SystemConfigPut
-from app_base.base.repos.base import ModelType
 from app_base.base.services.base import (
     BaseContextKwargs,
     BaseCreateServiceMixin,
@@ -23,8 +22,8 @@ class SystemConfigContextKwargs(BaseContextKwargs):
 
 
 class SystemConfigService(
-    UniqueConstraintHooksMixin,  # Ensure unique constraints before create/update
-    ExistsCheckHooksMixin,  # Ensure existence checks before operations
+    UniqueConstraintHooksMixin[SystemConfigContextKwargs],  # Ensure unique constraints before create/update
+    ExistsCheckHooksMixin[SystemConfigContextKwargs],  # Ensure existence checks before operations
     BaseCreateServiceMixin[SystemConfigRepository, SystemConfig, SystemConfigCreate, SystemConfigContextKwargs],
     BaseGetMultiServiceMixin[SystemConfigRepository, SystemConfig, SystemConfigContextKwargs],
     BaseGetServiceMixin[SystemConfigRepository, SystemConfig, SystemConfigContextKwargs],
@@ -57,6 +56,6 @@ class SystemConfigService(
         session: AsyncSession,
         name: str,
         context: Optional[SystemConfigContextKwargs] = None,
-    ) -> ModelType | None:
+    ) -> SystemConfig | None:
         """Get a SystemConfig by its name."""
         return await self.repo.get(session, where=self.repo.model.name == name)

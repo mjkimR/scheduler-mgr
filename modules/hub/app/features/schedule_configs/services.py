@@ -7,7 +7,6 @@ from app.features.schedule_configs.models import ScheduleConfig
 from app.features.schedule_configs.repos import ScheduleConfigRepository
 from app.features.schedule_configs.schemas import ScheduleConfigCreate, ScheduleConfigPatch, ScheduleConfigPut
 from app_base.base.exceptions.basic import NotFoundException
-from app_base.base.repos.base import ModelType
 from app_base.base.services.base import (
     BaseContextKwargs,
     BaseCreateServiceMixin,
@@ -27,8 +26,8 @@ class ScheduleConfigContextKwargs(BaseContextKwargs):
 
 
 class ScheduleConfigService(
-    UniqueConstraintHooksMixin,
-    ExistsCheckHooksMixin,
+    UniqueConstraintHooksMixin[ScheduleConfigContextKwargs],
+    ExistsCheckHooksMixin[ScheduleConfigContextKwargs],
     BaseCreateServiceMixin[ScheduleConfigRepository, ScheduleConfig, ScheduleConfigCreate, ScheduleConfigContextKwargs],
     BaseGetMultiServiceMixin[ScheduleConfigRepository, ScheduleConfig, ScheduleConfigContextKwargs],
     BaseGetServiceMixin[ScheduleConfigRepository, ScheduleConfig, ScheduleConfigContextKwargs],
@@ -73,7 +72,7 @@ class ScheduleConfigService(
         obj_data: ScheduleConfigCreate,
         context: Optional[ScheduleConfigContextKwargs] = None,
         **update_fields: Any,
-    ) -> ModelType:
+    ) -> ScheduleConfig:
         update_fields["next_run_at"] = self._calc_next_run(obj_data.cron_expression, obj_data.interval_seconds)
         return await super().create(session, obj_data, context, **update_fields)
 
@@ -84,7 +83,7 @@ class ScheduleConfigService(
         obj_data: ScheduleConfigPut,
         context: Optional[ScheduleConfigContextKwargs] = None,
         **update_fields: Any,
-    ) -> ModelType | None:
+    ) -> ScheduleConfig | None:
         exists = await self.repo.get_by_pk(session, obj_id)
         if not exists:
             raise NotFoundException(f"ScheduleConfig with id {obj_id} does not exist.")
@@ -103,7 +102,7 @@ class ScheduleConfigService(
         obj_data: ScheduleConfigPatch,
         context: Optional[ScheduleConfigContextKwargs] = None,
         **update_fields: Any,
-    ) -> ModelType | None:
+    ) -> ScheduleConfig | None:
         exists = await self.repo.get_by_pk(session, obj_id)
         if not exists:
             raise NotFoundException(f"ScheduleConfig with id {obj_id} does not exist.")
