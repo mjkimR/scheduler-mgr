@@ -1,0 +1,11 @@
+--- modules/hub/app/features/dispatchers/services.py
++++ modules/hub/app/features/dispatchers/services.py
+@@ -244,7 +244,7 @@
+                         finished_at=finished_at,
+                         error_message=error_message,
+                         retry_need=retry_need,
+-                        retry_attempts=ScheduleJob.retry_attempts + 1,
++                        retry_attempts=ScheduleJob.retry_attempts + 1 if hasattr(ScheduleJob, "retry_attempts") else 1,
+                     )
+                 )
+                 result = await session.execute(update_stmt)
