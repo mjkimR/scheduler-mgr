@@ -5,6 +5,7 @@ from alembic import context
 from app_base.base.models.mixin import Base
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
+import sqlalchemy as sa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -35,6 +36,20 @@ def get_url() -> str:
     return get_app_settings().DATABASE_URL
 
 
+def compare_type(context, inspected_column, metadata_column, inspected_type, metadata_type):
+    """Custom type comparison function for Alembic.
+    
+    It overrides the default type comparison behavior for specific database dialects.
+    Currently configured to ignore UUID type for SQLite database.
+    """
+    
+    # Ignore UUID type for SQLite
+    if context.dialect.name == "sqlite":
+        if isinstance(metadata_type, sa.UUID):
+            return False
+    return None
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -53,6 +68,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=compare_type,
     )
 
     with context.begin_transaction():
@@ -87,6 +103,7 @@ def do_run_migrations(connection):
         connection=connection,
         target_metadata=target_metadata,
         process_revision_directives=process_revision_directives,
+        compare_type=compare_type,
         render_item=render_item,
     )
 

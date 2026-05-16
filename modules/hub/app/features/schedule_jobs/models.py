@@ -20,9 +20,7 @@ class ScheduleJobStatus(StrEnum):
 
 class ScheduleJob(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "schedule_jobs"
-    __table_args__ = (
-        Index("ix_schedule_jobs_retry_lookup", "status", "retry_need", "retry_attempts"),
-    )
+    __table_args__ = (Index("ix_schedule_jobs_retry_lookup", "status", "retry_need", "retry_attempts"),)
     name: Mapped[str] = mapped_column(index=True)
 
     schedule_config_id: Mapped[UUID | None] = mapped_column(

@@ -8,9 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 class ScheduleConfig(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "schedule_configs"
-    __table_args__ = (
-        Index("ix_schedule_configs_enabled_next_run_at", "enabled", "next_run_at"),
-    )
+    __table_args__ = (Index("ix_schedule_configs_enabled_next_run_at", "enabled", "next_run_at"),)
     name: Mapped[str] = mapped_column(index=True, comment="Human-readable name of the schedule")
     description: Mapped[str | None] = mapped_column(
         nullable=True, comment="Optional description of what this schedule does"
