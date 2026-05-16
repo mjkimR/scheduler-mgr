@@ -5,7 +5,7 @@ from uuid import UUID
 
 from app.common.database import JSON_VARIANT
 from app_base.base.models.mixin import Base, TimestampMixin, UUIDMixin
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -20,15 +20,20 @@ class ScheduleJobStatus(StrEnum):
 
 class ScheduleJob(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "schedule_jobs"
-    name: Mapped[str] = mapped_column()
+    __table_args__ = (
+        Index("ix_schedule_jobs_retry_lookup", "status", "retry_need", "retry_attempts"),
+    )
+    name: Mapped[str] = mapped_column(index=True)
 
     schedule_config_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("schedule_configs.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
         comment="Reference to the schedule config that triggered this job execution.",
     )
     dispatcher_run_id: Mapped[UUID | None] = mapped_column(
         nullable=True,
+        index=True,
         comment="Reference to the dispatcher run that executed this job. This allows grouping multiple schedule jobs under a single dispatcher run for better traceability.",
     )
     status: Mapped[str] = mapped_column(
@@ -38,11 +43,13 @@ class ScheduleJob(Base, UUIDMixin, TimestampMixin):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        index=True,
         comment="Timestamp when the task execution started.",
     )
     finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+        index=True,
         comment="Timestamp when the task execution finished.",
     )
     payload: Mapped[dict] = mapped_column(

@@ -2,19 +2,22 @@ from datetime import datetime
 
 from app.common.database import JSON_VARIANT
 from app_base.base.models.mixin import Base, TimestampMixin, UUIDMixin
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ScheduleConfig(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "schedule_configs"
-    name: Mapped[str] = mapped_column(comment="Human-readable name of the schedule")
+    __table_args__ = (
+        Index("ix_schedule_configs_enabled_next_run_at", "enabled", "next_run_at"),
+    )
+    name: Mapped[str] = mapped_column(index=True, comment="Human-readable name of the schedule")
     description: Mapped[str | None] = mapped_column(
         nullable=True, comment="Optional description of what this schedule does"
     )
 
     task_func: Mapped[str] = mapped_column(
-        nullable=False, comment="Dotted path to the task function to execute (e.g. 'tasks.send_report')"
+        nullable=False, index=True, comment="Dotted path to the task function to execute (e.g. 'tasks.send_report')"
     )
     cron_expression: Mapped[str | None] = mapped_column(
         nullable=True,
@@ -41,10 +44,11 @@ class ScheduleConfig(Base, UUIDMixin, TimestampMixin):
         comment="Optional datetime after which the schedule is no longer executed",
     )
     last_run_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, comment="Timestamp of the most recent execution"
+        DateTime(timezone=True), nullable=True, index=True, comment="Timestamp of the most recent execution"
     )
     next_run_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+        index=True,
         comment="Timestamp of the next scheduled execution. NULL indicates this schedule should be executed immediately by the dispatcher.",
     )
