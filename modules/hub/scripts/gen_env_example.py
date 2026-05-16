@@ -20,6 +20,7 @@ from pydantic_settings import BaseSettings  # noqa: E402
 
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env.example")
 
+
 def _all_subclasses(cls):
     result = []
     for sub in cls.__subclasses__():
@@ -28,16 +29,20 @@ def _all_subclasses(cls):
         result.extend(_all_subclasses(sub))
     return result
 
+
 SKIP_MODULES = {
     "pydantic_settings",
     "pydantic",
 }
 
+
 def _should_include(cls) -> bool:
     module = cls.__module__ or ""
     return not any(module.startswith(skip) for skip in SKIP_MODULES)
 
+
 settings_classes = [cls for cls in _all_subclasses(BaseSettings) if _should_include(cls)]
+
 
 def _type_str(tp) -> str:
     if tp is type(None):
@@ -53,6 +58,7 @@ def _type_str(tp) -> str:
         args_str = ", ".join(_type_str(a) for a in args)
         return f"{origin_name}[{args_str}]"
     return getattr(tp, "__name__", str(tp))
+
 
 # Build .env.example content
 lines: list[str] = []

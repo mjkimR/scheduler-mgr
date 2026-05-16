@@ -1,4 +1,3 @@
-
 import pytest
 from app.features.tasks.core.registry import _registry, _wrap_with_payload_adapter, all_tasks, autodiscover, get, task
 from pydantic import BaseModel
